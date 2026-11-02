@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Vocab Master">
+  <title>Vocab Master - 25 Words Per Lesson</title>
+
+  <!-- Dynamic PWA Manifest & Icon Script -->
+  <script>
+    const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="115" fill="#4f46e5"/><path d="M140 140h232v50H140zm0 95h180v50H140zm0 95h232v50H140z" fill="#ffffff"/><circle cx="380" cy="260" r="45" fill="#fbbf24"/></svg>`;
+    const iconUrl = "data:image/svg+xml;base64," + btoa(svgIcon);
+
+    const manifest = {
+      name: "Vocab Master Pro",
+      short_name: "VocabMaster",
+      description: "English Vocabulary Flashcards, Synonyms, Antonyms & Quiz App",
+      start_url: "./index.html",
+      display: "standalone",
+      background_color: "#0f172a",
+      theme_color: "#4f46e5",
+      orientation: "portrait",
+      icons: [
+        { src: iconUrl, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+        { src: iconUrl, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
+      ]
+    };
+    const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+    const manifestLink = document.createElement('link');
+    manifestLink.rel = 'manifest';
+    manifestLink.href = URL.createObjectURL(manifestBlob);
+    document.head.appendChild(manifestLink);
+
+    const appleIcon = document.createElement('link');
+    appleIcon.rel = 'apple-touch-icon';
+    appleIcon.href = iconUrl;
+    document.head.appendChild(appleIcon);
+  </script>
+
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --syn-bg: #ecfdf5;
+      --syn-text: #059669;
+      --ant-bg: #fef2f2;
+      --ant-text: #dc2626;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding-bottom: 70px;
+      user-select: none;
+    }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      color: white;
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(79, 70, 229, 0.2);
+    }
+    .brand { font-size: 1.25rem; font-weight: 800; letter-spacing: 0.3px; }
+    .brand span { color: #fde047; }
+    #installBtn {
+      display: none;
+      background: #fde047;
+      color: #0f172a;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    /* Container */
+    .container { max-width: 720px; margin: 0 auto; padding: 16px; }
+
+    /* Lesson Selector */
+    .lesson-bar {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      scrollbar-width: none;
+    }
+    .lesson-bar::-webkit-scrollbar { display: none; }
+    .lesson-chip {
+      padding: 10px 18px;
+      border-radius: 12px;
+      background: white;
+      border: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .lesson-chip.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+      box-shadow: 0 4px 10px rgba(79,70,229,0.25);
+    }
+
+    /* Mode Tabs */
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      background: #e2e8f0;
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 18px;
+    }
+    .tab-btn {
+      padding: 10px;
+      border: none;
+      background: transparent;
+      border-radius: 9px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: white;
+      color: var(--primary);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+
+    /* Flashcard 3D */
+    .card-scene {
+      perspective: 1000px;
+      height: 390px;
+      margin-bottom: 18px;
+    }
+    .flashcard {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+    .flashcard.is-flipped { transform: rotateY(180deg); }
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 20px;
+      background: var(--card-bg);
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+      border: 1px solid var(--border);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .card-front {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .card-back { transform: rotateY(180deg); overflow-y: auto; }
+
+    .pos-tag {
+      background: #eef2ff;
+      color: var(--primary);
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .main-word { font-size: 2.4rem; font-weight: 900; color: var(--text); margin-bottom: 8px; }
+    .hindi-preview { font-size: 1.25rem; color: var(--primary); font-weight: 700; margin-bottom: 18px; }
+    .speak-btn {
+      background: #f1f5f9;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tap-hint { font-size: 0.8rem; color: var(--muted); margin-top: 22px; }
+
+    /* Back details */
+    .back-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .back-word { font-size: 1.4rem; font-weight: 800; color: var(--primary); }
+    .eng-meaning { font-size: 0.98rem; color: #334155; line-height: 1.45; margin-bottom: 14px; }
+    .pill-group { margin-bottom: 12px; }
+    .pill-title { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+    .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pill { padding: 4px 10px; border-radius: 8px; font-size: 0.83rem; font-weight: 600; }
+    .pill.syn { background: var(--syn-bg); color: var(--syn-text); }
+    .pill.ant { background: var(--ant-bg); color: var(--ant-text); }
+    .example-box {
+      background: #f8fafc;
+      border-left: 4px solid var(--primary);
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      font-style: italic;
+      color: #334155;
+      border-radius: 0 8px 8px 0;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .nav-btn {
+      flex: 1;
+      padding: 13px;
+      border: none;
+      border-radius: 12px;
+      background: var(--primary);
+      color: white;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    .nav-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+    .counter-badge { font-weight: 800; font-size: 1rem; color: var(--text); min-width: 70px; text-align: center; }
+
+    /* List View */
+    .search-box {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      margin-bottom: 14px;
+    }
+    .word-list-item {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+    }
+    .w-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .w-title { font-size: 1.15rem; font-weight: 800; color: var(--text); }
+    .w-hindi { color: var(--primary); font-weight: 700; font-size: 0.95rem; }
+
+    /* Quiz View */
+    .quiz-card {
+      background: white;
+      border-radius: 18px;
+      padding: 22px;
+      border: 1px solid var(--border);
+    }
+    .quiz-q { font-size: 1.15rem; font-weight: 800; margin: 12px 0 18px; }
+    .quiz-opt {
+      width: 100%;
+      text-align: left;
+      padding: 13px 16px;
+      margin-bottom: 10px;
+      border-radius: 12px;
+      border: 2px solid var(--border);
+      background: white;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    .quiz-opt.correct { background: #ecfdf5; border-color: #10b981; color: #065f46; }
+    .quiz-opt.wrong { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">Vocab<span>Master</span></div>
+    <button id="installBtn">📲 Install App</button>
+  </header>
+
+  <div class="container">
+    <!-- Lesson Selection -->
+    <div class="lesson-bar" id="lessonBar"></div>
+
+    <!-- Mode Switcher -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchMode('flashcard', this)">Flashcards</button>
+      <button class="tab-btn" onclick="switchMode('list', this)">25 Words List</button>
+      <button class="tab-btn" onclick="switchMode('quiz', this)">Practice Quiz</button>
+    </div>
+
+    <!-- FLASHCARD VIEW -->
+    <div id="flashcardView">
+      <div class="card-scene">
+        <div class="flashcard" id="flashcard" onclick="flipCard()">
+          <!-- Front -->
+          <div class="card-face card-front">
+            <span class="pos-tag" id="fcPos">Adjective</span>
+            <div class="main-word" id="fcWord">Word</div>
+            <div class="hindi-preview" id="fcHindi">अर्थ</div>
+            <button class="speak-btn" onclick="speakWord(event)">🔊 Pronounce</button>
+            <div class="tap-hint">👆 Tap card to see Synonyms & Antonyms</div>
+          </div>
+          <!-- Back -->
+          <div class="card-face card-back">
+            <div>
+              <div class="back-header">
+                <span class="back-word" id="fcBackWord">Word</span>
+                <span id="fcBackHindi" style="font-weight:700;">अर्थ</span>
+              </div>
+              <p class="eng-meaning" id="fcEng"></p>
+              <div class="pill-group">
+                <div class="pill-title">Synonyms (समानार्थी)</div>
+                <div class="pills" id="fcSyn"></div>
+              </div>
+              <div class="pill-group">
+                <div class="pill-title">Antonyms (विलोम)</div>
+                <div class="pills" id="fcAnt"></div>
+              </div>
+            </div>
+            <div class="example-box" id="fcEx"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="nav-btn" id="prevBtn" onclick="changeCard(-1)">⬅ Previous</button>
+        <div class="counter-badge" id="cardCounter">1 / 25</div>
+        <button class="nav-btn" id="nextBtn" onclick="changeCard(1)">Next ➡</button>
+      </div>
+    </div>
+
+    <!-- LIST VIEW -->
+    <div id="listView" class="hidden">
+      <input type="text" id="searchInput" class="search-box" placeholder="🔍 Search word or Hindi meaning..." oninput="renderList()">
+      <div id="wordListContainer"></div>
+    </div>
+
+    <!-- QUIZ VIEW -->
+    <div id="quizView" class="hidden">
+      <div class="quiz-card">
+        <div style="display:flex; justify-content:space-between; color:var(--muted); font-size:0.85rem; font-weight:700;">
+          <span id="quizProgress">Question 1/10</span>
+          <span id="quizScore">Score: 0</span>
+        </div>
+        <div class="quiz-q" id="quizQuestion">Loading...</div>
+        <div id="quizOptions"></div>
+        <button class="nav-btn" id="nextQuizBtn" style="margin-top:10px; width:100%; display:none;" onclick="nextQuizQuestion()">Next Question ➡</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const lessonsData = [
+      {
+        id: 1,
+        title: "Lesson 1: Top 25 Exam Vocab",
+        words: [
+          { word: "Abundant", pos: "Adjective", hindi: "प्रचुर / भरपूर", eng: "Existing or available in large quantities; plentiful.", syn: ["Plentiful", "Copious", "Ample", "Profuse"], ant: ["Scarce", "Sparse", "Deficient", "Rare"], ex: "The region has abundant natural resources." },
+          { word: "Benevolent", pos: "Adjective", hindi: "परोपकारी / दयालु", eng: "Well-meaning, kindly, and charitable towards others.", syn: ["Kind", "Compassionate", "Generous", "Altruistic"], ant: ["Malevolent", "Cruel", "Selfish", "Unkind"], ex: "A benevolent donor funded the entire library." },
+          { word: "Candid", pos: "Adjective", hindi: "स्पष्टवादी / निष्कपट", eng: "Truthful and straightforward; frank and honest.", syn: ["Frank", "Blunt", "Forthright", "Sincere"], ant: ["Deceitful", "Evasive", "Guarded", "Secretive"], ex: "She gave a candid interview about her struggles." },
+          { word: "Diligent", pos: "Adjective", hindi: "मेहनती / परिश्रमी", eng: "Having or showing care and conscientiousness in one's work.", syn: ["Industrious", "Assiduous", "Hardworking", "Meticulous"], ant: ["Lazy", "Indolent", "Negligent", "Careless"], ex: "Diligent students consistently achieve their goals." },
+          { word: "Ephemeral", pos: "Adjective", hindi: "क्षणिक / अल्पकालिक", eng: "Lasting for a very short time; transitory.", syn: ["Transient", "Fleeting", "Short-lived", "Momentary"], ant: ["Permanent", "Eternal", "Perpetual", "Enduring"], ex: "Fame in the digital age is often ephemeral." },
+          { word: "Frugal", pos: "Adjective", hindi: "मितव्ययी / किफायती", eng: "Sparing or economical with regard to money or food.", syn: ["Thrifty", "Economical", "Prudent", "Sparing"], ant: ["Extravagant", "Lavish", "Spendthrift", "Prodigal"], ex: "He leads a frugal lifestyle to save for the future." },
+          { word: "Garrulous", pos: "Adjective", hindi: "बातूनी / वाचाल", eng: "Excessively talkative, especially on trivial matters.", syn: ["Loquacious", "Talkative", "Voluble", "Chatty"], ant: ["Taciturn", "Reticent", "Quiet", "Reserved"], ex: "The garrulous host kept the guests entertained all evening." },
+          { word: "Haughty", pos: "Adjective", hindi: "अभिमानी / घमंडी", eng: "Arrogantly superior and disdainful.", syn: ["Arrogant", "Conceited", "Pompous", "Supercilious"], ant: ["Humble", "Modest", "Meek", "Unassuming"], ex: "His haughty behavior alienated his teammates." },
+          { word: "Immaculate", pos: "Adjective", hindi: "निर्मल / बेदाग", eng: "Perfectly clean, neat, or tidy; free from flaws.", syn: ["Spotless", "Pristine", "Flawless", "Unblemished"], ant: ["Filthy", "Tarnished", "Defiled", "Messy"], ex: "She kept her study room in immaculate condition." },
+          { word: "Jubilant", pos: "Adjective", hindi: "उल्लसित / आनंदित", eng: "Feeling or expressing great happiness and triumph.", syn: ["Elated", "Euphoric", "Exultant", "Ecstatic"], ant: ["Despondent", "Dejected", "Melancholic", "Sorrowful"], ex: "The jubilant crowd cheered after the final victory." },
+          { word: "Lucid", pos: "Adjective", hindi: "स्पष्ट / सुबोध", eng: "Expressed clearly; easy to understand.", syn: ["Clear", "Coherent", "Articulate", "Transparent"], ant: ["Ambiguous", "Obscure", "Vague", "Confusing"], ex: "The professor gave a lucid explanation of the theorem." },
+          { word: "Mitigate", pos: "Verb", hindi: "कम करना / शांत करना", eng: "Make less severe, serious, or painful.", syn: ["Alleviate", "Assuage", "Diminish", "Ease"], ant: ["Aggravate", "Exacerbate", "Intensify", "Worsen"], ex: "Planting trees helps mitigate the effects of pollution." },
+          { word: "Novice", pos: "Noun", hindi: "नौसिखिया", eng: "A person new to or inexperienced in a field or situation.", syn: ["Beginner", "Tyro", "Apprentice", "Neophyte"], ant: ["Veteran", "Expert", "Maestro", "Professional"], ex: "This tutorial is designed specifically for a novice." },
+          { word: "Obsolete", pos: "Adjective", hindi: "अप्रचलित / पुराना", eng: "No longer produced or used; out of date.", syn: ["Outdated", "Archaic", "Outmoded", "Defunct"], ant: ["Contemporary", "Modern", "Current", "Innovative"], ex: "Typewriters have become largely obsolete today." },
+          { word: "Pragmatic", pos: "Adjective", hindi: "व्यावहारिक", eng: "Dealing with things sensibly and realistically.", syn: ["Practical", "Realistic", "Rational", "Sensible"], ant: ["Idealistic", "Impractical", "Unrealistic", "Quixotic"], ex: "We need a pragmatic approach to solve this issue." },
+          { word: "Quell", pos: "Verb", hindi: "दबाना / शांत करना", eng: "Put an end to a rebellion or disorder; calm down.", syn: ["Suppress", "Subdue", "Pacify", "Squash"], ant: ["Incite", "Provoke", "Agitate", "Instigate"], ex: "Extra forces were called in to quell the unrest." },
+          { word: "Resilient", pos: "Adjective", hindi: "लचीला / सहनशील", eng: "Able to withstand or recover quickly from difficult conditions.", syn: ["Tough", "Adaptable", "Buoyant", "Hardy"], ant: ["Fragile", "Vulnerable", "Weak", "Brittle"], ex: "Athletes must remain mentally resilient under pressure." },
+          { word: "Scrutinize", pos: "Verb", hindi: "बारीकी से जांचना", eng: "Examine or inspect closely and thoroughly.", syn: ["Inspect", "Examine", "Analyze", "Probe"], ant: ["Overlook", "Glance", "Ignore", "Neglect"], ex: "Always scrutinize a contract before signing it." },
+          { word: "Tenacious", pos: "Adjective", hindi: "अटल / दृढ़", eng: "Tending to keep a firm hold of something; persistent.", syn: ["Persistent", "Resolute", "Dogged", "Steadfast"], ant: ["Yielding", "Irresolute", "Weak-willed", "Faltering"], ex: "Her tenacious spirit helped her clear the exam." },
+          { word: "Ubiquitous", pos: "Adjective", hindi: "सर्वव्यापी", eng: "Present, appearing, or found everywhere.", syn: ["Omnipresent", "Pervasive", "Universal", "Everywhere"], ant: ["Rare", "Scarce", "Infrequent", "Uncommon"], ex: "Smartphones have become ubiquitous in daily life." },
+          { word: "Venerate", pos: "Verb", hindi: "आदर करना / पूजना", eng: "Regard with great respect; revere.", syn: ["Revere", "Honor", "Esteem", "Idolize"], ant: ["Despise", "Scorn", "Disdain", "Dishonor"], ex: "Many cultures venerate their elders for their wisdom." },
+          { word: "Wary", pos: "Adjective", hindi: "सतर्क / सावधान", eng: "Feeling or showing caution about possible dangers.", syn: ["Cautious", "Circumspect", "Vigilant", "Alert"], ant: ["Reckless", "Heedless", "Careless", "Naive"], ex: "Be wary of emails asking for personal details." },
+          { word: "Zealous", pos: "Adjective", hindi: "उत्साही / जोशीला", eng: "Having or showing great energy or enthusiasm.", syn: ["Passionate", "Fervent", "Ardent", "Enthusiastic"], ant: ["Apathetic", "Indifferent", "Lethargic", "Unenthusiastic"], ex: "The team made a zealous effort to finish on time." },
+          { word: "Audacious", pos: "Adjective", hindi: "साहसी / निडर", eng: "Showing a willingness to take surprisingly bold risks.", syn: ["Bold", "Daring", "Intrepid", "Fearless"], ant: ["Timid", "Cowardly", "Craven", "Meek"], ex: "He made an audacious plan to climb the peak." },
+          { word: "Cordial", pos: "Adjective", hindi: "हार्दिक / मैत्रीपूर्ण", eng: "Warm and friendly in manner or tone.", syn: ["Friendly", "Affable", "Genial", "Amiable"], ant: ["Hostile", "Aloof", "Cold", "Unfriendly"], ex: "The two leaders shared a cordial relationship." }
+        ]
+      }
+    ];
+
+    let currentLessonIdx = 0;
+    let currentCardIdx = 0;
+    let quizQuestions = [];
+    let currentQuizIdx = 0;
+    let score = 0;
+
+    function initApp() {
+      renderLessonBar();
+      renderFlashcard();
+      renderList();
+      setupQuiz();
+    }
+
+    function renderLessonBar() {
+      const bar = document.getElementById('lessonBar');
+      bar.innerHTML = lessonsData.map((l, idx) => `
+        <button class="lesson-chip ${idx === currentLessonIdx ? 'active' : ''}" onclick="selectLesson(${idx})">
+          ${l.title} (${l.words.length})
+        </button>
+      `).join('');
+    }
+
+    function selectLesson(idx) {
+      currentLessonIdx = idx;
+      currentCardIdx = 0;
+      renderLessonBar();
+      renderFlashcard();
+      renderList();
+      setupQuiz();
+    }
+
+    function renderFlashcard() {
+      const cardEl = document.getElementById('flashcard');
+      cardEl.classList.remove('is-flipped');
+
+      const words = lessonsData[currentLessonIdx].words;
+      const item = words[currentCardIdx];
+
+      document.getElementById('fcPos').textContent = item.pos;
+      document.getElementById('fcWord').textContent = item.word;
+      document.getElementById('fcHindi').textContent = item.hindi;
+      document.getElementById('fcBackWord').textContent = item.word;
+      document.getElementById('fcBackHindi').textContent = item.hindi;
+      document.getElementById('fcEng').textContent = item.eng;
+      document.getElementById('fcSyn').innerHTML = item.syn.map(s => `<span class="pill syn">${s}</span>`).join('');
+      document.getElementById('fcAnt').innerHTML = item.ant.map(a => `<span class="pill ant">${a}</span>`).join('');
+      document.getElementById('fcEx').textContent = `"${item.ex}"`;
+
+      document.getElementById('cardCounter').textContent = `${currentCardIdx + 1} / ${words.length}`;
+      document.getElementById('prevBtn').disabled = currentCardIdx === 0;
+      document.getElementById('nextBtn').disabled = currentCardIdx === words.length - 1;
+    }
+
+    function flipCard() {
+      document.getElementById('flashcard').classList.toggle('is-flipped');
+    }
+
+    function changeCard(dir) {
+      const words = lessonsData[currentLessonIdx].words;
+      const next = currentCardIdx + dir;
+      if (next >= 0 && next < words.length) {
+        currentCardIdx = next;
+        renderFlashcard();
+      }
+    }
+
+    function speakWord(e) {
+      e.stopPropagation();
+      const word = lessonsData[currentLessonIdx].words[currentCardIdx].word;
+      if ('speechSynthesis' in window) {
+        const utter = new SpeechSynthesisUtterance(word);
+        utter.lang = 'en-US';
+        window.speechSynthesis.speak(utter);
+      }
+    }
+
+    function switchMode(mode, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      document.getElementById('flashcardView').classList.toggle('hidden', mode !== 'flashcard');
+      document.getElementById('listView').classList.toggle('hidden', mode !== 'list');
+      document.getElementById('quizView').classList.toggle('hidden', mode !== 'quiz');
+
+      if (mode === 'quiz') setupQuiz();
+    }
+
+    function renderList() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const words = lessonsData[currentLessonIdx].words.filter(w =>
+        w.word.toLowerCase().includes(q) || w.hindi.includes(q) || w.syn.join(' ').toLowerCase().includes(q)
+      );
+
+      document.getElementById('wordListContainer').innerHTML = words.map((w, i) => `
+        <div class="word-list-item">
+          <div class="w-head">
+            <span class="w-title">${i + 1}. ${w.word} <small style="color:var(--muted);font-weight:500;">(${w.pos})</small></span>
+            <span class="w-hindi">${w.hindi}</span>
+          </div>
+          <p style="font-size:0.88rem;color:#475569;margin-bottom:8px;">${w.eng}</p>
+          <div class="pills" style="margin-bottom:6px;">
+            ${w.syn.map(s => `<span class="pill syn">S: ${s}</span>`).join('')}
+            ${w.ant.map(a => `<span class="pill ant">A: ${a}</span>`).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function setupQuiz() {
+      const words = [...lessonsData[currentLessonIdx].words];
+      quizQuestions = words.sort(() => 0.5 - Math.random()).slice(0, 10).map(item => {
+        const correct = item.syn[0];
+        const wrongPool = words.filter(w => w.word !== item.word).map(w => w.syn[0]);
+        const options = [correct, ...wrongPool.sort(() => 0.5 - Math.random()).slice(0, 3)].sort(() => 0.5 - Math.random());
+        return {
+          q: `"${item.word}" (${item.hindi}) का सही Synonym चुनें:`,
+          options,
+          answer: correct
+        };
+      });
+      currentQuizIdx = 0;
+      score = 0;
+      renderQuizQuestion();
+    }
+
+    function renderQuizQuestion() {
+      const qObj = quizQuestions[currentQuizIdx];
+      document.getElementById('quizProgress').textContent = `Question ${currentQuizIdx + 1} / ${quizQuestions.length}`;
+      document.getElementById('quizScore').textContent = `Score: ${score}`;
+      document.getElementById('quizQuestion').textContent = qObj.q;
+      document.getElementById('nextQuizBtn').style.display = 'none';
+
+      document.getElementById('quizOptions').innerHTML = qObj.options.map(opt => `
+        <button class="quiz-opt" onclick="checkQuizAnswer(this, '${opt}', '${qObj.answer}')">${opt}</button>
+      `).join('');
+    }
+
+    function checkQuizAnswer(btn, selected, correct) {
+      const allBtns = document.querySelectorAll('.quiz-opt');
+      allBtns.forEach(b => {
+        b.disabled = true;
+        if (b.textContent === correct) b.classList.add('correct');
+      });
+      if (selected === correct) {
+        score++;
+        document.getElementById('quizScore').textContent = `Score: ${score}`;
+      } else {
+        btn.classList.add('wrong');
+      }
+      document.getElementById('nextQuizBtn').style.display = 'block';
+    }
+
+    function nextQuizQuestion() {
+      currentQuizIdx++;
+      if (currentQuizIdx < quizQuestions.length) {
+        renderQuizQuestion();
+      } else {
+        document.getElementById('quizQuestion').textContent = `🎉 Quiz Completed! आपका स्कोर: ${score} / ${quizQuestions.length}`;
+        document.getElementById('quizOptions').innerHTML = `<button class="nav-btn" style="width:100%" onclick="setupQuiz()">🔄 Restart Quiz</button>`;
+        document.getElementById('nextQuizBtn').style.display = 'none';
+      }
+    }
+
+    // Install Prompt Handling
+    let deferredPrompt;
+    const installBtn = document.getElementById('installBtn');
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'block';
+    });
+
+    installBtn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        installBtn.style.display = 'none';
+      }
+    });
+
+    initApp();
+  </script>
+</body>
+</html>
